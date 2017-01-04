@@ -1,0 +1,10 @@
+package: gt-go-ms
+import:
+- package: github.com/go-kit/kit
+  version: ^0.3.0
+  subpackages:
+  - endpoint
+  - transport/http
+- package: golang.org/x/net
+  subpackages:
+  - context
