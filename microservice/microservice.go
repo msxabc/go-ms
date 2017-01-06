@@ -4,91 +4,100 @@ import (
 	"strings"
 	"strconv"
 	//"gt-go-ms/config"
-	//"gt-go-ms/route"
 	//"gt-go-ms/log"
 	"gt-go-ms/endpoint"
 	"net/http"
 	"golang.org/x/net/context"
 	httptransport "github.com/go-kit/kit/transport/http"
 	gkEndpoint "github.com/go-kit/kit/endpoint"
+
 )
 
 type MSOperation interface {
-	Send()
-	Receive()
-	Close()
-	decodeRequest(_ context.Context, r *http.Request) (interface{}, error)
-	encodeResponse(_ context.Context, w http.ResponseWriter, resp interface{}) error
-	makeEndpoint() gkEndpoint.Endpoint
+	AddEndpoint(epHandler endpoint.EndpointHandler, epName string, req endpoint.RequestUnmarshaler, resp endpoint.ResponseMarshaller)
+	Start(port int)
+	Stop()
+}
 
+
+type msHandler struct {
+	requestHandler httptransport.DecodeRequestFunc
+	responseHandler httptransport.EncodeResponseFunc
+	epHandler gkEndpoint.Endpoint
 }
 
 type Microservice struct {
-	requestHandler endpoint.RequestUnmarshaler
-	responseHandler endpoint.ResponseMarshaller
-	epHandler endpoint.EndpointHandler
-	epName string
-	port int
+	eps map[string]*msHandler
 	ctx context.Context
 }
 
-//TODO: right now we can only create one endpoint per port, should use a map structure to allow for multiple definitions 
-func New (epHandler endpoint.EndpointHandler, epName string, req endpoint.RequestUnmarshaler, resp endpoint.ResponseMarshaller, port int) (*Microservice, error){
+func (ms *Microservice) AddEndpoint(epHandler endpoint.EndpointHandler, epName string, req endpoint.RequestUnmarshaler, resp endpoint.ResponseMarshaller){
+	reqFunc := buildRequestUnmarshalFunc(req)
+	respFunc := buildResponseMarshalFunc(resp)
+	endpoint := buildEndpoint(epHandler)
+	msh := &msHandler{reqFunc, respFunc, endpoint}
+	ms.eps[epName] = msh
+}
+
+
+//TODO: start transport based on configuration
+func (ms *Microservice) Start(port int){
+	startHTTPService(ms, port)
+}
+
+
+func (ms *Microservice) Stop(){
+
+}
+
+func buildRequestUnmarshalFunc(reqFunc endpoint.RequestUnmarshaler) httptransport.DecodeRequestFunc{
+	return func (_ context.Context, r *http.Request) (interface{}, error) {
+		return reqFunc(r.Body)
+	}
+}
+
+func buildResponseMarshalFunc(respFunc endpoint.ResponseMarshaller) httptransport.EncodeResponseFunc {
+	return func (_ context.Context, w http.ResponseWriter, resp interface{}) error {
+		return respFunc(w, resp)
+	}
+}
+
+func buildEndpoint(epHandler endpoint.EndpointHandler) gkEndpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+			return epHandler(request)
+	}
+}
+
+func startHTTPService(ms *Microservice, port int) (error){
+
+	for ep, msh := range ms.eps {
+		httpServer := httptransport.NewServer(
+			ms.ctx,
+			msh.epHandler,
+			msh.requestHandler,
+			msh.responseHandler,
+		)
+		if (strings.HasPrefix(ep, "/")){
+			http.Handle(ep, httpServer)
+		}else{
+			http.Handle("/"+ep, httpServer)
+		}
+	}
+	return http.ListenAndServe(":" + strconv.Itoa(port), nil)
+}
+
+
+func New() (*Microservice){
 	ms := &Microservice{}
 	ms.ctx = context.Background()
-	ms.requestHandler = req
-	ms.responseHandler = resp
-	ms.epHandler = epHandler
-
-	if (strings.HasPrefix(epName, "/")){
-		ms.epName = epName
-	}else{
-		ms.epName = "/" + epName
-	}
-	
-	ms.port = port
-
-	return ms, newHTTPService(ms)
-}
-
-func newHTTPService(ms *Microservice) (error){
-
-	httpServer := httptransport.NewServer(
-		ms.ctx,
-		ms.makeEndpoint(),
-		ms.decodeRequest,
-		ms.encodeResponse,
-	)
-
-
-	http.Handle(ms.epName, httpServer)
-	return http.ListenAndServe(":" + strconv.Itoa(ms.port), nil)
-}
-
-func (ms *Microservice) makeEndpoint() gkEndpoint.Endpoint {
-	return func(ctx context.Context, request interface{}) (interface{}, error) {
-			return ms.epHandler(request)
-	}
+	ms.eps = make(map[string]*msHandler)
+	return ms
 }
 
 
-func (ms *Microservice) decodeRequest(_ context.Context, r *http.Request) (interface{}, error) {
-	return ms.requestHandler(r.Body)
-}
 
 
-func (ms *Microservice) encodeResponse(_ context.Context, w http.ResponseWriter, resp interface{}) error {
-	return ms.responseHandler (w, resp)
-}
 
-func (ms *Microservice) Send(){
-	
-}
 
-func (ms *Microservice) Receive(){
-	
-}
 
-func (ms *Microservice) Close(){
 
-}
