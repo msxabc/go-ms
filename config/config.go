@@ -22,6 +22,7 @@ type Config struct {
 	Log *logConfig `json:"log"`
 	RouteType string `json:"routeType"`
 	RouteFile string  `json:"routeFile"`
+	PropertyFile string `json:"propertyFile"`
 }
 
 type logConfig struct {
@@ -29,10 +30,12 @@ type logConfig struct {
 	Level string `json:"level"`
 }
 
+var appProperties map[string]interface{}
+
 
 var c *Config
 var once sync.Once //each MS should have only one copy of config
-var configFile string = "/etc/gt-go-ms.json"
+var configFile string = "/etc/gt-agent.json"
 var reloadChannels map[chan bool] interface{}
 
 
@@ -68,6 +71,7 @@ func New(filename string) (*Config, error){
 		        	e := loadConfig()
 			        if (e != nil){
 			        	log.Println("Error: Unable to reload config parameters. Application will continue ot use current configuration parameters.  You can try to restart this application to apply new changes")
+			        	log.Println(e)
 			        }	
 			        for c, _ := range reloadChannels {
 			        	c<-true
@@ -78,11 +82,25 @@ func New(filename string) (*Config, error){
 
     })
 
+    if filename != configFile && err == nil {
+    	//possibile reusing of New function with a different file
+    	err = errors.New("Unable to create new configuraiton from " + filename + ", using current configuration created from : " + configFile)
+    }
+
 	return c, err
 }
 
-func Get() *Config {
+func Get() *Config{
 	return c
+}
+
+func GetAppConfig(name string) (interface{}, error) {
+	if v, ok := appProperties[name]; !ok{
+		return "", errors.New("No config key defined for " + name)
+	}else{
+		return v, nil
+	}
+
 }
 
 func CallMeWhenReload(c chan bool){
@@ -99,6 +117,20 @@ func loadConfig() (error){
 	
 	if (err != nil){
 		return err
+	}
+
+	if c.PropertyFile != ""{
+		appProperties = make(map[string]interface{})
+		data, err = ioutil.ReadFile(c.PropertyFile) 
+		if (err != nil){
+			return err
+		}
+
+		err = json.Unmarshal(data, &appProperties)
+	
+		if (err != nil){
+			return err
+		}
 	}
 
 
