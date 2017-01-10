@@ -9,7 +9,7 @@ import (
 
 func TestLog(t *testing.T){
 	t.Log("Starting log test") 
-	l := log.New()
+	l := log.Get()
 	if (l == nil){
 		t.Error("Error happened, returned nil log")
 		t.FailNow()

@@ -17,7 +17,12 @@ var badData = []byte(`{"data":"abc123", "command":"google"}`)
 
 
 func TestMSSetup(t * testing.T){
-	ms := microservice.New()
+	ms, err := microservice.New()
+	if (err != nil){
+		t.Error(err)
+		t.FailNow()
+	}
+	
 	ms.AddEndpoint(MakeEchoEndpoint(), "echo", DecodeEchoRequest(), EncodeEchoResponse())
 	ms.AddEndpoint(MakeAddEndpoint(), "add", DecodeAddRequest(), EncodeAddResponse())
 	go ms.Start(8080)

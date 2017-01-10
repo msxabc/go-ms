@@ -127,6 +127,25 @@ func TestBadConfig(t *testing.T){
 
 }
 
+func TestReload(t *testing.T){
+	data := badData
+
+	err := ioutil.WriteFile("./testConfig.json", []byte(data), os.ModePerm)
+	if (err != nil){
+		t.Error(err)
+		t.FailNow()
+	}
+
+	config.New("./testConfig.json")
+	ch := make(chan bool)
+	config.CallMeWhenReload(ch)
+	sendSIGHUP()
+	rl := <-ch
+	if (true != rl) {
+		t.Error("Expected reload signal true, but got false")
+	}
+}
+
 
 func sendSIGHUP(){
 	syscall.Kill(syscall.Getpid(), syscall.SIGHUP)

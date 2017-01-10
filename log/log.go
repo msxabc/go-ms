@@ -28,7 +28,7 @@ type Logger interface{
 }
 
 
-func New() (Logger){
+func new() (Logger){
 	
 	once.Do(func() {
 		w, e := syslog.New(getFacility() | getSeverity(), os.Args[0])
@@ -43,7 +43,7 @@ func New() (Logger){
 }
 
 func Get() (Logger){
-	if (l == nil) {New()}
+	if (l == nil) {new()}
 	return l
 }
 
@@ -139,7 +139,7 @@ func getSeverity () syslog.Priority{
 	var s syslog.Priority
 	c := config.Get()
 
-	if c == nil { return syslog.LOG_DEBUG}
+	if c == nil { return syslog.LOG_INFO}
 
 	switch strings.ToLower(c.Log.Level){
 		case "emerg": s = syslog.LOG_EMERG

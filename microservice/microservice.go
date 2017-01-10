@@ -31,6 +31,18 @@ type Microservice struct {
 	ctx context.Context
 }
 
+func New() (*Microservice, error){
+
+	if err:= msInit(); err != nil {
+		return nil, err
+	}
+
+	ms := &Microservice{}
+	ms.ctx = context.Background()
+	ms.eps = make(map[string]*msHandler)
+	return ms, nil
+}
+
 func (ms *Microservice) AddEndpoint(epHandler endpoint.EndpointHandler, epName string, req endpoint.RequestUnmarshaler, resp endpoint.ResponseMarshaller){
 	reqFunc := buildRequestUnmarshalFunc(req)
 	respFunc := buildResponseMarshalFunc(resp)
@@ -39,8 +51,7 @@ func (ms *Microservice) AddEndpoint(epHandler endpoint.EndpointHandler, epName s
 	ms.eps[epName] = msh
 }
 
-
-//TODO: start transport based on configuration
+//TODO: start transport based on transport configuration
 func (ms *Microservice) Start(port int){
 	startHTTPService(ms, port)
 }
@@ -48,6 +59,12 @@ func (ms *Microservice) Start(port int){
 
 func (ms *Microservice) Stop(){
 
+}
+
+//initialize everything enabled by the framework
+func msInit() error{
+
+	return nil
 }
 
 func buildRequestUnmarshalFunc(reqFunc endpoint.RequestUnmarshaler) httptransport.DecodeRequestFunc{
@@ -69,7 +86,6 @@ func buildEndpoint(epHandler endpoint.EndpointHandler) gkEndpoint.Endpoint {
 }
 
 func startHTTPService(ms *Microservice, port int) (error){
-
 	for ep, msh := range ms.eps {
 		httpServer := httptransport.NewServer(
 			ms.ctx,
@@ -87,12 +103,6 @@ func startHTTPService(ms *Microservice, port int) (error){
 }
 
 
-func New() (*Microservice){
-	ms := &Microservice{}
-	ms.ctx = context.Background()
-	ms.eps = make(map[string]*msHandler)
-	return ms
-}
 
 
 

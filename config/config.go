@@ -20,6 +20,8 @@ const defaults string = `{
 
 type Config struct {
 	Log *logConfig `json:"log"`
+	RouteType string `json:"routeType"`
+	RouteFile string  `json:"routeFile"`
 }
 
 type logConfig struct {
@@ -27,9 +29,11 @@ type logConfig struct {
 	Level string `json:"level"`
 }
 
+
 var c *Config
-var once sync.Once
+var once sync.Once //each MS should have only one copy of config
 var configFile string = "/etc/gt-go-ms.json"
+var reloadChannels map[chan bool] interface{}
 
 
 func New(filename string) (*Config, error){
@@ -55,6 +59,7 @@ func New(filename string) (*Config, error){
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, syscall.SIGHUP)
 		
+		reloadChannels = make(map[chan bool]interface{})
 
 		go func() {
 			for {
@@ -64,6 +69,9 @@ func New(filename string) (*Config, error){
 			        if (e != nil){
 			        	log.Println("Error: Unable to reload config parameters. Application will continue ot use current configuration parameters.  You can try to restart this application to apply new changes")
 			        }	
+			        for c, _ := range reloadChannels {
+			        	c<-true
+			        }
 			    }
 		    }
 		}()
@@ -75,6 +83,10 @@ func New(filename string) (*Config, error){
 
 func Get() *Config {
 	return c
+}
+
+func CallMeWhenReload(c chan bool){
+	reloadChannels[c] = nil
 }
 
 
